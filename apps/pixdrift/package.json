@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "echo \"(no tests yet)\"",
+    "test": "vitest run",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:migrate:dry": "tsx scripts/migrate.ts --dry-run"
   },
@@ -30,8 +30,10 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",
+    "testcontainers": "^12.1.0",
     "tsx": "^4.23.12",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   },
   "packageManager": "pnpm@10.33.3"
 }

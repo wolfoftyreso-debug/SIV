@@ -2,10 +2,18 @@ import { NextResponse } from "next/server";
 import { getEmploymentCaseService } from "@/modules/employment-cases/infrastructure/serviceFactory";
 import { requireActorContext } from "@/core/requestContext";
 import { EmploymentCasesError } from "@/modules/employment-cases";
+import { hasPermission } from "@/core/permissions";
 
 export async function POST(req: Request) {
   try {
     const actor = await requireActorContext();
+    if (!hasPermission(actor.roles, "employment_cases.write")) {
+      throw new EmploymentCasesError({
+        code: "CASE_ACCESS_DENIED",
+        httpStatus: 403,
+        message: "Du saknar behörighet att skapa personalärenden.",
+      });
+    }
     const body = (await req.json()) as { title?: string; description?: string };
 
     const title = (body.title ?? "").trim() || "Personalärende";
