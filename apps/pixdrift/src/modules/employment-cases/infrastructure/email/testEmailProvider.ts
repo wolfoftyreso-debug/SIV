@@ -17,7 +17,7 @@ export class TestEmailProvider implements EmailProvider {
 
   async send(message: OutboundEmail): Promise<SendResult> {
     const providerMessageId = `test_${randomUUID()}`;
-    return { provider: "test", providerMessageId, raw: { message } };
+    return { provider: "test", providerMessageId, raw: { message, attachments: message.attachments?.length ?? 0 } };
   }
 
   async verifyWebhook(_headers: Headers, rawBody: string): Promise<VerifiedWebhookEvent> {

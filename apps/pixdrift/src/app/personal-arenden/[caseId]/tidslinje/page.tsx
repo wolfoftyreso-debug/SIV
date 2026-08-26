@@ -123,6 +123,9 @@ export default async function CaseTimelinePage(props: { params: Promise<{ caseId
         >
           Kommunikation
         </Link>
+        <Link href={`/personal-arenden/${caseId}/moten`} className="rounded-md px-3 py-1.5 text-zinc-700 hover:underline">
+          Möten
+        </Link>
         <Link href={`/personal-arenden/${caseId}/dokument`} className="rounded-md px-3 py-1.5 text-zinc-700 hover:underline">
           Dokument
         </Link>

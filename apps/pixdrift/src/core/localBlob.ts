@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 
@@ -22,5 +22,14 @@ export async function storePrivateBytesLocal(input: {
   const filePath = path.join(dir, `${sha256}_${safeName}`);
   await writeFile(filePath, input.bytes);
   return { blobPath: `local:${filePath}`, sha256, sizeBytes: input.bytes.byteLength };
+}
+
+export async function readPrivateBytesLocal(blobPath: string): Promise<Uint8Array> {
+  if (!blobPath.startsWith("local:")) {
+    throw new Error("Unsupported blob path");
+  }
+  const filePath = blobPath.slice("local:".length);
+  const buf = await readFile(filePath);
+  return new Uint8Array(buf);
 }
 

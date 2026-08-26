@@ -12,7 +12,10 @@ import {
 import { getEmailProvider } from "../email/emailProviderFactory";
 import { sanitizeInboundHtml } from "../email/sanitizeInboundHtml";
 import { storePrivateBytesLocal } from "@/core/localBlob";
-import { evidenceItems } from "@/db/schema";
+import { readPrivateBytesLocal } from "@/core/localBlob";
+import { evidenceItems, caseMeetings, meetingParticipants, caseDocuments, caseDocumentVersions } from "@/db/schema";
+import { renderDemoTemplate, ensureDemoTemplates } from "@/modules/employment-cases/infrastructure/documents/demoTemplates";
+import { buildIcs } from "@/modules/employment-cases/infrastructure/meetings/ics";
 
 export async function ensureCaseAlias(input: { tenantId: string; caseId: string; inboundDomain: string }) {
   const token = `case-${randomUUID().replaceAll("-", "").slice(0, 18)}`;
@@ -53,6 +56,7 @@ export async function createOutboundDraft(input: {
   bodyText: string;
   bodyHtml?: string;
   to: string[];
+  attachments?: Array<{ blobPath: string; filename: string; contentType: string }>;
 }) {
   const now = new Date().toISOString();
   const fromAddress = process.env.EMAIL_FROM_ADDRESS || "no-reply@pixdrift.local";
@@ -72,6 +76,7 @@ export async function createOutboundDraft(input: {
       toAddresses: input.to,
       ccAddresses: [],
       bccAddresses: [],
+      attachments: input.attachments ?? [],
       provider: null,
       providerMessageId: null,
       threadKey: null,
@@ -160,6 +165,21 @@ export async function dispatchQueuedEmailSend(input: { tenantId: string; payload
     const alias = await ensureCaseAlias({ tenantId: input.tenantId, caseId: comm.caseId, inboundDomain });
     const replyTo = `${alias.aliasLocalPart}@${alias.inboundDomain}`;
 
+    const attachmentsMeta = (comm.attachments as any) ?? [];
+    const attachments = [];
+    for (const a of attachmentsMeta) {
+      try {
+        const bytes = await readPrivateBytesLocal(String(a.blobPath));
+        attachments.push({
+          filename: String(a.filename),
+          contentType: String(a.contentType ?? "application/octet-stream"),
+          bytes,
+        });
+      } catch {
+        // best-effort; attachment errors should not corrupt internal state
+      }
+    }
+
     const result = await provider.send({
       from: comm.fromAddress,
       to: (comm.toAddresses as any) ?? [],
@@ -170,6 +190,7 @@ export async function dispatchQueuedEmailSend(input: { tenantId: string; payload
       html: comm.bodyHtml ?? undefined,
       replyTo,
       headers: { "x-pixdrift-case-id": comm.caseId },
+      attachments,
     });
 
     await db
@@ -290,5 +311,130 @@ export async function processInboundReceivedEmail(input: { providerEmailId: stri
   } finally {
     await sql.end({ timeout: 5 });
   }
+}
+
+export async function generateMeetingInvitationAndDraftEmail(input: {
+  tenantId: string;
+  caseId: string;
+  meetingId: string;
+  actorId: string;
+}) {
+  const nowIso = new Date().toISOString();
+
+  return withTenantTx(input.tenantId, async (db) => {
+    await ensureDemoTemplates(db);
+
+    const meeting = (
+      await db
+        .select()
+        .from(caseMeetings)
+        .where(and(eq(caseMeetings.tenantId, input.tenantId), eq(caseMeetings.caseId, input.caseId), eq(caseMeetings.id, input.meetingId)))
+        .limit(1)
+    )[0];
+    if (!meeting) return { ok: false as const, reason: "meeting_not_found" as const };
+
+    const participants = await db
+      .select()
+      .from(meetingParticipants)
+      .where(and(eq(meetingParticipants.tenantId, input.tenantId), eq(meetingParticipants.meetingId, input.meetingId)));
+
+    const employeeEmail =
+      participants.find((p) => p.role === "employee" && p.participantEmail)?.participantEmail ??
+      participants.find((p) => p.participantEmail)?.participantEmail ??
+      null;
+
+    const scheduled = meeting.scheduledAt;
+    const date = scheduled.toLocaleDateString("sv-SE");
+    const time = scheduled.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+
+    const html = renderDemoTemplate("meeting_invitation", {
+      employer_name: "Pixdrift (demo)",
+      employee_name: participants.find((p) => p.role === "employee")?.participantName ?? "Arbetstagare",
+      meeting_title: meeting.title,
+      meeting_purpose: meeting.purpose,
+      meeting_date: date,
+      meeting_time: time,
+      meeting_location: meeting.location ?? "—",
+      participants: participants.map((p) => p.participantName).join(", "),
+      preparation_items: "Ta med eventuell relevant information eller frågor.",
+      response_contact: "Svara på detta mejl för att bekräfta eller ställa frågor.",
+    });
+
+    const docId = randomUUID();
+    await db.insert(caseDocuments).values({
+      id: docId,
+      tenantId: input.tenantId,
+      caseId: input.caseId,
+      templateKey: "meeting_invitation",
+      status: "generated",
+      createdBy: input.actorId,
+      createdAt: new Date(nowIso),
+      updatedAt: new Date(nowIso),
+      version: 1,
+    });
+
+    await db.insert(caseDocumentVersions).values({
+      id: randomUUID(),
+      tenantId: input.tenantId,
+      caseId: input.caseId,
+      documentId: docId,
+      version: 1,
+      html,
+      pdfBlobPath: null,
+      createdBy: input.actorId,
+      createdAt: new Date(nowIso),
+    });
+
+    // Build ICS and store to private blob (local for now; will map to Vercel Blob later).
+    const ics = buildIcs({
+      uid: `pixdrift-${meeting.id}`,
+      startUtc: new Date(meeting.scheduledAt),
+      durationMinutes: 60,
+      summary: meeting.title,
+      description: meeting.purpose,
+      location: meeting.location ?? undefined,
+      organizerEmail: process.env.EMAIL_FROM_ADDRESS ?? undefined,
+      attendees: participants
+        .filter((p) => p.participantEmail)
+        .map((p) => ({ email: p.participantEmail!, name: p.participantName })),
+    });
+
+    const stored = await storePrivateBytesLocal({
+      tenantId: input.tenantId,
+      caseId: input.caseId,
+      filename: "kallelse.ics",
+      bytes: new TextEncoder().encode(ics),
+    });
+
+    // Create outbound email draft referencing the ICS attachment.
+    const subject = `Kallelse: ${meeting.title}`;
+    const bodyText = `Kallelse till möte\n\nTitel: ${meeting.title}\nSyfte: ${meeting.purpose}\nTid: ${date} kl. ${time}\nPlats: ${meeting.location ?? "—"}\n\nNOT_LEGALLY_REVIEWED (teknisk mall)\n`;
+
+    const commId = randomUUID();
+    await db.insert(caseCommunications).values({
+      id: commId,
+      tenantId: input.tenantId,
+      caseId: input.caseId,
+      direction: "outbound",
+      status: "draft",
+      subject,
+      bodyText,
+      bodyHtml: html,
+      fromAddress: process.env.EMAIL_FROM_ADDRESS || "no-reply@pixdrift.local",
+      toAddresses: employeeEmail ? [employeeEmail] : [],
+      ccAddresses: [],
+      bccAddresses: [],
+      attachments: [{ blobPath: stored.blobPath, filename: "kallelse.ics", contentType: "text/calendar" }],
+      provider: null,
+      providerMessageId: null,
+      threadKey: null,
+      createdBy: input.actorId,
+      createdAt: new Date(nowIso),
+      updatedAt: new Date(nowIso),
+      version: 1,
+    });
+
+    return { ok: true as const, documentId: docId, communicationId: commId };
+  });
 }
 

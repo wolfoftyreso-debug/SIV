@@ -55,6 +55,9 @@ export default async function CaseCommunicationPage(props: { params: Promise<{ c
           Tidslinje
         </Link>
         <span className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 font-medium text-zinc-900">Kommunikation</span>
+        <Link href={`/personal-arenden/${caseId}/moten`} className="rounded-md px-3 py-1.5 text-zinc-700 hover:underline">
+          Möten
+        </Link>
         <Link href={`/personal-arenden/${caseId}/dokument`} className="rounded-md px-3 py-1.5 text-zinc-700 hover:underline">
           Dokument
         </Link>

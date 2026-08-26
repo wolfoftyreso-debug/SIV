@@ -8,6 +8,11 @@ export type OutboundEmail = {
   html?: string;
   replyTo?: string;
   headers?: Record<string, string>;
+  attachments?: Array<{
+    filename: string;
+    contentType: string;
+    bytes: Uint8Array;
+  }>;
 };
 
 export type SendResult = {

@@ -59,6 +59,9 @@ export default async function CaseDocumentsPage(props: { params: Promise<{ caseI
         >
           Kommunikation
         </Link>
+        <Link href={`/personal-arenden/${caseId}/moten`} className="rounded-md px-3 py-1.5 text-zinc-700 hover:underline">
+          Möten
+        </Link>
         <span className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 font-medium text-zinc-900">Dokument</span>
       </nav>
 

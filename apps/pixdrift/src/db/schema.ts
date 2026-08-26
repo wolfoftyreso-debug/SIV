@@ -578,6 +578,7 @@ export const caseCommunications = pgTable(
     toAddresses: jsonb("to_addresses").notNull().$type<string[]>().default([]),
     ccAddresses: jsonb("cc_addresses").notNull().$type<string[]>().default([]),
     bccAddresses: jsonb("bcc_addresses").notNull().$type<string[]>().default([]),
+    attachments: jsonb("attachments").notNull().$type<Array<{ blobPath: string; filename: string; contentType: string }>>().default([]),
     provider: text("provider"),
     providerMessageId: text("provider_message_id"),
     threadKey: text("thread_key"),

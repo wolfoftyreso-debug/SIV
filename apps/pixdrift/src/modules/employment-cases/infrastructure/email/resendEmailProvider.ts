@@ -24,6 +24,12 @@ export class ResendEmailProvider implements EmailProvider {
   ) {}
 
   async send(message: OutboundEmail): Promise<SendResult> {
+    const attachments = message.attachments?.map((a) => ({
+      filename: a.filename,
+      content: Buffer.from(a.bytes).toString("base64"),
+      content_type: a.contentType,
+    }));
+
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -40,6 +46,7 @@ export class ResendEmailProvider implements EmailProvider {
         html: message.html,
         reply_to: message.replyTo,
         headers: message.headers,
+        attachments,
       }),
     });
 
