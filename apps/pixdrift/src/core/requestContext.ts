@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { EmploymentCasesError } from "@/modules/employment-cases";
+import { randomUUID } from "node:crypto";
 
 export type ActorContext = {
   actorId: string;
@@ -7,10 +8,15 @@ export type ActorContext = {
   roles: string[];
 };
 
+declare global {
+  // eslint-disable-next-line no-var
+  var __pixdriftDevContext: { tenantId: string; actorId: string } | undefined;
+}
+
 export async function requireActorContext(): Promise<ActorContext> {
   const h = await headers();
-  const tenantId = h.get("x-dev-tenant-id") ?? process.env.DEV_TENANT_ID ?? "";
-  const actorId = h.get("x-dev-actor-id") ?? process.env.DEV_ACTOR_ID ?? "";
+  let tenantId = h.get("x-dev-tenant-id") ?? process.env.DEV_TENANT_ID ?? "";
+  let actorId = h.get("x-dev-actor-id") ?? process.env.DEV_ACTOR_ID ?? "";
   const rolesHeader = h.get("x-dev-roles") ?? process.env.DEV_ROLES ?? "tenant_owner";
 
   if (process.env.NODE_ENV === "production") {
@@ -22,12 +28,25 @@ export async function requireActorContext(): Promise<ActorContext> {
     });
   }
 
+  if ((!tenantId || !actorId) && process.env.STRICT_DEV_CONTEXT !== "true") {
+    const existing = globalThis.__pixdriftDevContext;
+    if (existing) {
+      tenantId = tenantId || existing.tenantId;
+      actorId = actorId || existing.actorId;
+    } else {
+      const created = { tenantId: randomUUID(), actorId: randomUUID() };
+      globalThis.__pixdriftDevContext = created;
+      tenantId = tenantId || created.tenantId;
+      actorId = actorId || created.actorId;
+    }
+  }
+
   if (!tenantId || !actorId) {
     throw new EmploymentCasesError({
       code: "TENANT_CONTEXT_REQUIRED",
       httpStatus: 401,
       message:
-        "Dev tenant/actor saknas. Sätt headers x-dev-tenant-id och x-dev-actor-id eller env DEV_TENANT_ID/DEV_ACTOR_ID.",
+        "Dev tenant/actor saknas. Sätt headers x-dev-tenant-id och x-dev-actor-id eller env DEV_TENANT_ID/DEV_ACTOR_ID (eller slå av STRICT_DEV_CONTEXT).",
     });
   }
 
