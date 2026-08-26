@@ -1,4 +1,4 @@
-import { pgEnum, pgTable, text, timestamp, uuid, integer, jsonb, boolean, varchar } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp, uuid, integer, jsonb, boolean, varchar, date } from "drizzle-orm/pg-core";
 import { index, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const dataClassificationEnum = pgEnum("data_classification", [
@@ -202,6 +202,56 @@ export const caseBlockers = pgTable(
   (t) => ({
     tenantCaseIdx: index("case_blockers_tenant_case_idx").on(t.tenantId, t.caseId),
     activeIdx: index("case_blockers_active_idx").on(t.tenantId, t.caseId, t.status),
+  })
+);
+
+export const caseTasks = pgTable(
+  "case_tasks",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => employmentCases.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    status: text("status").notNull(),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    createdBy: uuid("created_by").notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    completedBy: uuid("completed_by"),
+  },
+  (t) => ({
+    tenantCaseIdx: index("case_tasks_tenant_case_idx").on(t.tenantId, t.caseId),
+    dueIdx: index("case_tasks_due_idx").on(t.tenantId, t.dueAt),
+  })
+);
+
+export const caseDeadlines = pgTable(
+  "case_deadlines",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => employmentCases.id, { onDelete: "cascade" }),
+    deadlineKey: text("deadline_key").notNull(),
+    dueDate: date("due_date").notNull(),
+    timezone: text("timezone").notNull().default("Europe/Stockholm"),
+    computedFrom: jsonb("computed_from").notNull().$type<Record<string, unknown>>().default({}),
+    ruleVersionRef: text("rule_version_ref"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    createdBy: uuid("created_by").notNull(),
+    manualOverride: boolean("manual_override").notNull().default(false),
+    overrideReason: text("override_reason"),
+  },
+  (t) => ({
+    tenantCaseIdx: index("case_deadlines_tenant_case_idx").on(t.tenantId, t.caseId),
+    dueIdx: index("case_deadlines_due_idx").on(t.tenantId, t.dueDate),
   })
 );
 

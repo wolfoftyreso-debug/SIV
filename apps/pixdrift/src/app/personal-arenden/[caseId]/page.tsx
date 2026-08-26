@@ -4,6 +4,10 @@ import { notFound } from "next/navigation";
 import { requireActorContext } from "@/core/requestContext";
 import { hasPermission } from "@/core/permissions";
 import { getEmploymentCaseService } from "@/modules/employment-cases/infrastructure/serviceFactory";
+import { withTenantTx } from "@/core/tenantTx";
+import { caseBlockers } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import { evaluateEmploymentCaseRulesAction } from "../actions";
 
 export const metadata = {
   title: "Personalärende | Pixdrift",
@@ -19,6 +23,16 @@ export default async function EmploymentCaseOverviewPage(props: { params: Promis
   const service = getEmploymentCaseService();
   const c = await service.getById(actor.tenantId, caseId);
   if (!c) notFound();
+
+  const blockers =
+    process.env.DATABASE_URL && process.env.EMPLOYMENT_CASES_DB_MODE !== "memory"
+      ? await withTenantTx(actor.tenantId, async (db) => {
+          return db
+            .select()
+            .from(caseBlockers)
+            .where(and(eq(caseBlockers.tenantId, actor.tenantId), eq(caseBlockers.caseId, caseId), eq(caseBlockers.status, "active")));
+        })
+      : [];
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
@@ -62,7 +76,40 @@ export default async function EmploymentCaseOverviewPage(props: { params: Promis
             Nästa steg kommer från workflow + readiness + regelutfall. I nästa iteration kopplas detta till P0–P7 och
             blockerare.
           </p>
+          <form action={evaluateEmploymentCaseRulesAction} className="mt-4">
+            <input type="hidden" name="caseId" value={caseId} />
+            <button
+              type="submit"
+              className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+            >
+              Utvärdera regler (demo)
+            </button>
+          </form>
         </div>
+      </div>
+
+      <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-medium text-zinc-900">Blockerare</div>
+            <p className="mt-1 text-sm text-zinc-600">
+              Demo-blockerare (NOT_LEGALLY_REVIEWED) baserade på bekräftade fakta.
+            </p>
+          </div>
+          <div className="text-xs text-zinc-600">{blockers.length} aktiva</div>
+        </div>
+        {blockers.length === 0 ? (
+          <p className="mt-4 text-sm text-zinc-700">Inga aktiva blockerare ännu.</p>
+        ) : (
+          <ul className="mt-4 space-y-2">
+            {blockers.map((b) => (
+              <li key={b.id} className="rounded-md border border-zinc-200 p-3">
+                <div className="text-sm font-medium text-zinc-900">{b.messageKey}</div>
+                <div className="mt-1 text-xs text-zinc-600">{b.blockerKey}</div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
