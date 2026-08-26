@@ -47,6 +47,27 @@ export default async function EmploymentCaseOverviewPage(props: { params: Promis
         </Link>
       </div>
 
+      <nav className="mt-6 flex flex-wrap gap-2 text-sm">
+        <Link
+          href={`/personal-arenden/${caseId}`}
+          className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 font-medium text-zinc-900"
+        >
+          Översikt
+        </Link>
+        <Link href={`/personal-arenden/${caseId}/tidslinje`} className="rounded-md px-3 py-1.5 text-zinc-700 hover:underline">
+          Tidslinje
+        </Link>
+        <Link
+          href={`/personal-arenden/${caseId}/kommunikation`}
+          className="rounded-md px-3 py-1.5 text-zinc-700 hover:underline"
+        >
+          Kommunikation
+        </Link>
+        <Link href={`/personal-arenden/${caseId}/dokument`} className="rounded-md px-3 py-1.5 text-zinc-700 hover:underline">
+          Dokument
+        </Link>
+      </nav>
+
       <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="rounded-lg border border-zinc-200 bg-white p-5">
           <div className="text-sm font-medium text-zinc-900">Ärendets läge</div>
