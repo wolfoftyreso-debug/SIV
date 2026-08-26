@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { EmploymentCasesError } from "@/modules/employment-cases";
+import { EmploymentCasesError } from "@pia/employment-cases";
 import { randomUUID } from "node:crypto";
 
 export type ActorContext = {

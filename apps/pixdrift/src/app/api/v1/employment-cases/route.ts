@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getEmploymentCaseService } from "@/modules/employment-cases/infrastructure/serviceFactory";
 import { requireActorContext } from "@/core/requestContext";
-import { EmploymentCasesError } from "@/modules/employment-cases";
+import { EmploymentCasesError } from "@pia/employment-cases";
 import { hasPermission } from "@/core/permissions";
 
 export async function GET() {

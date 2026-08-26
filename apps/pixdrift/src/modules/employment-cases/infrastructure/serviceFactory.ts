@@ -1,6 +1,6 @@
 import { systemClock } from "@/core/clock";
 import { defaultIdGenerator } from "@/core/ids";
-import { EmploymentCaseService } from "../application/employmentCaseService";
+import { EmploymentCaseService } from "@pia/employment-cases";
 import { MemoryEmploymentCaseRepository } from "./memoryEmploymentCaseRepository";
 import { DbEmploymentCaseRepository } from "./dbEmploymentCaseRepository";
 
