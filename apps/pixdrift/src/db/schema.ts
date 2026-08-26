@@ -372,3 +372,180 @@ export const evidenceItems = pgTable(
   })
 );
 
+export const documentTemplates = pgTable(
+  "document_templates",
+  {
+    id: uuid("id").primaryKey(),
+    key: text("key").notNull(),
+    title: text("title").notNull(),
+    status: text("status").notNull(),
+    notLegallyReviewed: boolean("not_legally_reviewed").notNull().default(true),
+    synthetic: boolean("synthetic").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    keyUidx: uniqueIndex("document_templates_key_uidx").on(t.key),
+  })
+);
+
+export const documentTemplateVersions = pgTable(
+  "document_template_versions",
+  {
+    id: uuid("id").primaryKey(),
+    templateId: uuid("template_id")
+      .notNull()
+      .references(() => documentTemplates.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    content: jsonb("content").notNull().$type<Record<string, unknown>>(),
+    status: text("status").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    templateVersionUidx: uniqueIndex("document_template_versions_uidx").on(t.templateId, t.version),
+  })
+);
+
+export const caseDocuments = pgTable(
+  "case_documents",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => employmentCases.id, { onDelete: "cascade" }),
+    templateKey: text("template_key").notNull(),
+    status: text("status").notNull(),
+    createdBy: uuid("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    version: integer("version").notNull(),
+  },
+  (t) => ({
+    tenantCaseIdx: index("case_documents_tenant_case_idx").on(t.tenantId, t.caseId),
+  })
+);
+
+export const caseDocumentVersions = pgTable(
+  "case_document_versions",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => employmentCases.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => caseDocuments.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    html: text("html").notNull(),
+    pdfBlobPath: text("pdf_blob_path"),
+    createdBy: uuid("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (t) => ({
+    docVersionUidx: uniqueIndex("case_document_versions_uidx").on(t.documentId, t.version),
+  })
+);
+
+export const documentApprovals = pgTable(
+  "document_approvals",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => employmentCases.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => caseDocuments.id, { onDelete: "cascade" }),
+    decision: text("decision").notNull(),
+    rationale: text("rationale").notNull().default(""),
+    decidedBy: uuid("decided_by").notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull(),
+  },
+  (t) => ({
+    docIdx: index("document_approvals_doc_idx").on(t.tenantId, t.documentId, t.decidedAt),
+  })
+);
+
+export const caseEmailAliases = pgTable(
+  "case_email_aliases",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => employmentCases.id, { onDelete: "cascade" }),
+    aliasLocalPart: text("alias_local_part").notNull(),
+    inboundDomain: text("inbound_domain").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    active: boolean("active").notNull().default(true),
+  },
+  (t) => ({
+    aliasUidx: uniqueIndex("case_email_aliases_uidx").on(t.inboundDomain, t.aliasLocalPart),
+    tenantCaseIdx: index("case_email_aliases_tenant_case_idx").on(t.tenantId, t.caseId),
+  })
+);
+
+export const caseCommunications = pgTable(
+  "case_communications",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => employmentCases.id, { onDelete: "cascade" }),
+    direction: text("direction").notNull(),
+    status: text("status").notNull(),
+    subject: text("subject").notNull(),
+    bodyText: text("body_text").notNull(),
+    bodyHtml: text("body_html"),
+    fromAddress: text("from_address").notNull(),
+    toAddresses: jsonb("to_addresses").notNull().$type<string[]>().default([]),
+    ccAddresses: jsonb("cc_addresses").notNull().$type<string[]>().default([]),
+    bccAddresses: jsonb("bcc_addresses").notNull().$type<string[]>().default([]),
+    provider: text("provider"),
+    providerMessageId: text("provider_message_id"),
+    threadKey: text("thread_key"),
+    createdBy: uuid("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    version: integer("version").notNull(),
+  },
+  (t) => ({
+    tenantCaseIdx: index("case_communications_tenant_case_idx").on(t.tenantId, t.caseId),
+  })
+);
+
+export const communicationEvents = pgTable(
+  "communication_events",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => employmentCases.id, { onDelete: "cascade" }),
+    communicationId: uuid("communication_id")
+      .notNull()
+      .references(() => caseCommunications.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    payload: jsonb("payload").notNull().$type<Record<string, unknown>>().default({}),
+  },
+  (t) => ({
+    commIdx: index("communication_events_comm_idx").on(t.tenantId, t.communicationId, t.occurredAt),
+  })
+);
+
