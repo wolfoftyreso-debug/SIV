@@ -4,9 +4,9 @@ export default function Home() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 px-6 py-20 font-sans text-zinc-950">
       <main className="w-full max-w-lg rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold tracking-tight">Pixdrift</h1>
+        <h1 className="text-xl font-semibold tracking-tight">PIA</h1>
         <p className="mt-2 text-sm leading-6 text-zinc-600">
-          Intern utvecklingsmiljö. Gå vidare till modulen <span className="font-medium">Personalärenden</span>.
+          Pixdrifts ärendeplattform. Gå vidare till <span className="font-medium">Personalärenden</span>.
         </p>
         <div className="mt-6">
           <Link

@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pixdrift",
-  description: "Pixdrift",
+  title: "PIA | Pixdrift",
+  description: "PIA (Pixdrifts ärendeplattform)",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
