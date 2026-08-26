@@ -16,6 +16,16 @@ export class MemoryEmploymentCaseRepository implements EmploymentCaseRepository 
     return this.cases.get(this.key(tenantId, caseId)) ?? null;
   }
 
+  async listByTenant(
+    tenantId: string,
+    input?: { limit?: number; status?: EmploymentCase["status"] }
+  ): Promise<EmploymentCase[]> {
+    const all = [...this.cases.values()].filter((c) => c.tenantId === tenantId);
+    const filtered = input?.status ? all.filter((c) => c.status === input.status) : all;
+    const limit = input?.limit ?? 50;
+    return filtered.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
+  }
+
   async update(caseData: EmploymentCase): Promise<void> {
     this.cases.set(this.key(caseData.tenantId, caseData.id), caseData);
   }

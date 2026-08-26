@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { createEmploymentCaseDraftAction } from "../actions";
 
 export const metadata = {
   title: "Nytt personalärende | Pixdrift",
@@ -23,7 +24,15 @@ export default function NewEmploymentCasePage() {
           tenant-isolerat utkast sparas efter varje steg.
         </p>
 
-        <form className="mt-6 space-y-4">
+        <form action={createEmploymentCaseDraftAction} className="mt-6 space-y-4">
+          <label className="block">
+            <span className="text-sm font-medium text-zinc-900">Neutral rubrik</span>
+            <input
+              name="title"
+              className="mt-2 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+              placeholder="Ex. Sen ankomst – återkommande"
+            />
+          </label>
           <label className="block">
             <span className="text-sm font-medium text-zinc-900">Beskrivning</span>
             <textarea
@@ -34,7 +43,7 @@ export default function NewEmploymentCasePage() {
             />
           </label>
           <button
-            type="button"
+            type="submit"
             className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800"
           >
             Fortsätt

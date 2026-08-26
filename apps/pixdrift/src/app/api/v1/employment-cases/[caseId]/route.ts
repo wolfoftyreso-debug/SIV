@@ -4,7 +4,7 @@ import { requireActorContext } from "@/core/requestContext";
 import { EmploymentCasesError } from "@/modules/employment-cases";
 import { hasPermission } from "@/core/permissions";
 
-export async function GET() {
+export async function GET(_req: Request, ctx: { params: Promise<{ caseId: string }> }) {
   try {
     const actor = await requireActorContext();
     if (!hasPermission(actor.roles, "employment_cases.read")) {
@@ -15,9 +15,15 @@ export async function GET() {
       });
     }
 
+    const { caseId } = await ctx.params;
     const service = getEmploymentCaseService();
-    const cases = await service.list(actor.tenantId, { limit: 50 });
-    return NextResponse.json({ ok: true, cases }, { status: 200 });
+    const c = await service.getById(actor.tenantId, caseId);
+
+    if (!c) {
+      throw new EmploymentCasesError({ code: "CASE_NOT_FOUND", httpStatus: 404, message: "Ärendet hittades inte." });
+    }
+
+    return NextResponse.json({ ok: true, case: c }, { status: 200 });
   } catch (err) {
     if (err instanceof EmploymentCasesError) {
       return NextResponse.json(
@@ -29,30 +35,31 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function PATCH(req: Request, ctx: { params: Promise<{ caseId: string }> }) {
   try {
     const actor = await requireActorContext();
     if (!hasPermission(actor.roles, "employment_cases.write")) {
       throw new EmploymentCasesError({
         code: "CASE_ACCESS_DENIED",
         httpStatus: 403,
-        message: "Du saknar behörighet att skapa personalärenden.",
+        message: "Du saknar behörighet att ändra personalärenden.",
       });
     }
-    const body = (await req.json()) as { title?: string; description?: string };
 
-    const title = (body.title ?? "").trim() || "Personalärende";
-    const description = (body.description ?? "").trim();
+    const { caseId } = await ctx.params;
+    const body = (await req.json()) as { expectedVersion: number; title?: string; description?: string };
 
     const service = getEmploymentCaseService();
-    const result = await service.createDraft({
+    await service.updateDraft({
       tenantId: actor.tenantId,
       actorId: actor.actorId,
-      title,
-      description,
+      caseId,
+      expectedVersion: body.expectedVersion,
+      title: body.title,
+      description: body.description,
     });
 
-    return NextResponse.json({ ok: true, ...result }, { status: 201 });
+    return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {
     if (err instanceof EmploymentCasesError) {
       return NextResponse.json(

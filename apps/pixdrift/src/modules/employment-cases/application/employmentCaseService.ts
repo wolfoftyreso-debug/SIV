@@ -1,6 +1,6 @@
 import type { CreateEmploymentCaseDraftCommand, UpdateEmploymentCaseDraftCommand } from "./commands";
 import type { Clock, EmploymentCaseRepository, IdGenerator } from "./ports";
-import { createEmploymentCaseDraft, updateEmploymentCaseDraft } from "../domain/employmentCase";
+import { createEmploymentCaseDraft, updateEmploymentCaseDraft, type EmploymentCase } from "../domain/employmentCase";
 import { EmploymentCasesError } from "../domain/errors";
 
 export class EmploymentCaseService {
@@ -11,6 +11,14 @@ export class EmploymentCaseService {
       clock: Clock;
     }
   ) {}
+
+  async list(tenantId: string, input?: { limit?: number; status?: EmploymentCase["status"] }) {
+    return this.deps.repo.listByTenant(tenantId, input);
+  }
+
+  async getById(tenantId: string, caseId: string) {
+    return this.deps.repo.getById(tenantId, caseId);
+  }
 
   async createDraft(cmd: CreateEmploymentCaseDraftCommand): Promise<{ caseId: string }> {
     if (!cmd.tenantId) {

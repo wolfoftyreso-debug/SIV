@@ -56,6 +56,25 @@ export class DbEmploymentCaseRepository implements EmploymentCaseRepository {
     });
   }
 
+  async listByTenant(
+    tenantId: string,
+    input?: { limit?: number; status?: EmploymentCase["status"] }
+  ): Promise<EmploymentCase[]> {
+    return withTenantTx(tenantId, async (db) => {
+      const limit = input?.limit ?? 50;
+      const base = db
+        .select()
+        .from(employmentCases)
+        .where(input?.status ? and(eq(employmentCases.tenantId, tenantId), eq(employmentCases.status, input.status)) : eq(employmentCases.tenantId, tenantId))
+        .orderBy(employmentCases.createdAt)
+        .limit(limit);
+
+      const rows = await base;
+      // createdAt ordering ascending; reverse to show newest first
+      return rows.map(mapRowToDomain).reverse();
+    });
+  }
+
   async update(caseData: EmploymentCase): Promise<void> {
     await withTenantTx(caseData.tenantId, async (db) => {
       await db

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PostgreSqlContainer } from "testcontainers";
+import { GenericContainer, Wait } from "testcontainers";
 import postgres from "postgres";
 import { randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
@@ -32,19 +32,25 @@ async function applyMigrations(sql: ReturnType<typeof postgres>) {
 
 describe("RLS tenant isolation", () => {
   it("denies cross-tenant reads for application role", async () => {
-    let container: Awaited<ReturnType<PostgreSqlContainer["start"]>> | undefined;
+    let container: Awaited<ReturnType<GenericContainer["start"]>> | undefined;
     try {
-      container = await new PostgreSqlContainer("postgres:16-alpine")
-        .withDatabase("pixdrift")
-        .withUsername("pixdrift_admin")
-        .withPassword("pixdrift_admin_pw")
+      container = await new GenericContainer("postgres:16-alpine")
+        .withEnvironment({
+          POSTGRES_DB: "pixdrift",
+          POSTGRES_USER: "pixdrift_admin",
+          POSTGRES_PASSWORD: "pixdrift_admin_pw",
+        })
+        .withExposedPorts(5432)
+        .withWaitStrategy(Wait.forLogMessage("database system is ready to accept connections"))
         .start();
     } catch (e) {
       // If Docker isn't available in the environment, skip rather than failing the whole suite.
       return;
     }
 
-    const adminUrl = container.getConnectionUri();
+    const adminUrl = `postgresql://pixdrift_admin:pixdrift_admin_pw@${container.getHost()}:${container.getMappedPort(
+      5432
+    )}/pixdrift`;
     const sqlAdmin = postgres(adminUrl, { max: 1 });
 
     try {

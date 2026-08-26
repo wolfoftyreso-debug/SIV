@@ -12,6 +12,10 @@ export interface IdGenerator {
 export interface EmploymentCaseRepository {
   create(caseDraft: EmploymentCase): Promise<void>;
   getById(tenantId: string, caseId: string): Promise<EmploymentCase | null>;
+  listByTenant(
+    tenantId: string,
+    input?: { limit?: number; status?: EmploymentCase["status"] }
+  ): Promise<EmploymentCase[]>;
   update(caseData: EmploymentCase): Promise<void>;
 }
 
