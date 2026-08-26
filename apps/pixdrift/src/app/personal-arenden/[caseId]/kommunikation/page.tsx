@@ -6,7 +6,7 @@ import { requireActorContext } from "@/core/requestContext";
 import { hasPermission } from "@/core/permissions";
 import { getEmploymentCaseService } from "@/modules/employment-cases/infrastructure/serviceFactory";
 import { withTenantTx } from "@/core/tenantTx";
-import { caseCommunications } from "@/db/schema";
+import { caseCommunications, caseDocuments } from "@/db/schema";
 import { approveMessageAction, createMessageAction, sendMessageAction } from "./actions";
 
 export const metadata = {
@@ -33,6 +33,23 @@ export default async function CaseCommunicationPage(props: { params: Promise<{ c
             .limit(50);
         })
       : [];
+
+  const relatedDocs =
+    messages.length && process.env.DATABASE_URL && process.env.EMPLOYMENT_CASES_DB_MODE !== "memory"
+      ? await withTenantTx(actor.tenantId, async (db) => {
+          const ids = messages.map((m) => m.relatedDocumentId).filter(Boolean) as string[];
+          if (ids.length === 0) return new Map<string, { status: string; templateKey: string }>();
+          const rows = await db
+            .select()
+            .from(caseDocuments)
+            .where(and(eq(caseDocuments.tenantId, actor.tenantId), eq(caseDocuments.caseId, caseId)));
+          const map = new Map<string, { status: string; templateKey: string }>();
+          for (const r of rows) {
+            map.set(r.id, { status: r.status, templateKey: r.templateKey });
+          }
+          return map;
+        })
+      : new Map<string, { status: string; templateKey: string }>();
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
@@ -110,6 +127,10 @@ export default async function CaseCommunicationPage(props: { params: Promise<{ c
                       <div className="mt-1 text-xs text-zinc-600">
                         {m.direction} · {m.status}
                         {m.provider ? ` · ${m.provider}` : ""}
+                        {m.relatedDocumentId ? (() => {
+                          const d = relatedDocs.get(m.relatedDocumentId);
+                          return d ? ` · dokument:${d.templateKey} (${d.status})` : " · dokument:(okänt)";
+                        })() : ""}
                       </div>
                       <div className="mt-2 whitespace-pre-wrap text-sm text-zinc-700">{m.bodyText}</div>
                     </div>

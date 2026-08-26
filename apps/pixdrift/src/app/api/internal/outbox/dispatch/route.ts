@@ -24,9 +24,11 @@ export async function POST(req: Request) {
     const payload = await loadOutboxPayload(tenantId, evt.payloadReference);
     try {
       if (evt.type === "email.send") {
-        await dispatchQueuedEmailSend({ tenantId, payload, nowIso });
+        const res = await dispatchQueuedEmailSend({ tenantId, payload, nowIso });
+        if (!res.ok) throw new Error("email.send failed");
       } else if (evt.type === "email.received") {
-        await processInboundReceivedEmail({ providerEmailId: String((payload as any)?.providerEmailId ?? ""), nowIso });
+        const res = await processInboundReceivedEmail({ providerEmailId: String((payload as any)?.providerEmailId ?? ""), nowIso });
+        if (!res.ok) throw new Error(`email.received failed: ${res.reason}`);
       }
 
       await withTenantTx(tenantId, async (db) => {

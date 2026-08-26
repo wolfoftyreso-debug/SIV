@@ -7,6 +7,7 @@ import { hasPermission } from "@/core/permissions";
 import { getEmploymentCaseService } from "@/modules/employment-cases/infrastructure/serviceFactory";
 import { withTenantTx } from "@/core/tenantTx";
 import { caseDocuments } from "@/db/schema";
+import { approveDocumentAction } from "./actions";
 
 export const metadata = {
   title: "Dokument | Pixdrift",
@@ -81,6 +82,19 @@ export default async function CaseDocumentsPage(props: { params: Promise<{ caseI
                   </div>
                   <div className="text-xs text-zinc-600">{d.createdAt.toISOString().slice(0, 16).replace("T", " ")}</div>
                 </div>
+
+                {d.status !== "approved" ? (
+                  <form action={approveDocumentAction} className="mt-3">
+                    <input type="hidden" name="caseId" value={caseId} />
+                    <input type="hidden" name="documentId" value={d.id} />
+                    <button
+                      type="submit"
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-zinc-300 bg-white px-2.5 text-xs font-medium text-zinc-900 hover:bg-zinc-50"
+                    >
+                      Godkänn dokument
+                    </button>
+                  </form>
+                ) : null}
               </li>
             ))}
           </ul>

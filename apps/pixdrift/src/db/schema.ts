@@ -579,6 +579,7 @@ export const caseCommunications = pgTable(
     ccAddresses: jsonb("cc_addresses").notNull().$type<string[]>().default([]),
     bccAddresses: jsonb("bcc_addresses").notNull().$type<string[]>().default([]),
     attachments: jsonb("attachments").notNull().$type<Array<{ blobPath: string; filename: string; contentType: string }>>().default([]),
+    relatedDocumentId: uuid("related_document_id").references(() => caseDocuments.id, { onDelete: "set null" }),
     provider: text("provider"),
     providerMessageId: text("provider_message_id"),
     threadKey: text("thread_key"),

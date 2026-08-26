@@ -16,6 +16,7 @@ import { readPrivateBytesLocal } from "@/core/localBlob";
 import { evidenceItems, caseMeetings, meetingParticipants, caseDocuments, caseDocumentVersions } from "@/db/schema";
 import { renderDemoTemplate, ensureDemoTemplates } from "@/modules/employment-cases/infrastructure/documents/demoTemplates";
 import { buildIcs } from "@/modules/employment-cases/infrastructure/meetings/ics";
+import { EmploymentCasesError } from "@pia/employment-cases";
 
 export async function ensureCaseAlias(input: { tenantId: string; caseId: string; inboundDomain: string }) {
   const token = `case-${randomUUID().replaceAll("-", "").slice(0, 18)}`;
@@ -57,6 +58,7 @@ export async function createOutboundDraft(input: {
   bodyHtml?: string;
   to: string[];
   attachments?: Array<{ blobPath: string; filename: string; contentType: string }>;
+  relatedDocumentId?: string | null;
 }) {
   const now = new Date().toISOString();
   const fromAddress = process.env.EMAIL_FROM_ADDRESS || "no-reply@pixdrift.local";
@@ -77,6 +79,7 @@ export async function createOutboundDraft(input: {
       ccAddresses: [],
       bccAddresses: [],
       attachments: input.attachments ?? [],
+      relatedDocumentId: input.relatedDocumentId ?? null,
       provider: null,
       providerMessageId: null,
       threadKey: null,
@@ -115,6 +118,42 @@ export async function enqueueSendOutbound(input: { tenantId: string; caseId: str
   const idempotencyKey = `email.send:${input.communicationId}`;
 
   return withTenantTx(input.tenantId, async (db) => {
+    const comm = (
+      await db
+        .select()
+        .from(caseCommunications)
+        .where(and(eq(caseCommunications.tenantId, input.tenantId), eq(caseCommunications.caseId, input.caseId), eq(caseCommunications.id, input.communicationId)))
+        .limit(1)
+    )[0];
+    if (!comm) {
+      throw new EmploymentCasesError({ code: "CASE_NOT_FOUND", httpStatus: 404, message: "Meddelandet hittades inte." });
+    }
+
+    if (comm.status !== "approved") {
+      throw new EmploymentCasesError({
+        code: "COMMUNICATION_NOT_APPROVED",
+        httpStatus: 409,
+        message: "Meddelandet måste godkännas innan det kan köas för skickning.",
+      });
+    }
+
+    if (comm.relatedDocumentId) {
+      const doc = (
+        await db
+          .select()
+          .from(caseDocuments)
+          .where(and(eq(caseDocuments.tenantId, input.tenantId), eq(caseDocuments.caseId, input.caseId), eq(caseDocuments.id, comm.relatedDocumentId)))
+          .limit(1)
+      )[0];
+      if (!doc || doc.status !== "approved") {
+        throw new EmploymentCasesError({
+          code: "DOCUMENT_NOT_APPROVED",
+          httpStatus: 409,
+          message: "Dokumentet måste godkännas innan utskick kan ske.",
+        });
+      }
+    }
+
     const payloadId = randomUUID();
     await db.insert(outboxPayloads).values({
       id: payloadId,
@@ -158,8 +197,34 @@ export async function dispatchQueuedEmailSend(input: { tenantId: string; payload
     const comm = (
       await db.select().from(caseCommunications).where(and(eq(caseCommunications.tenantId, input.tenantId), eq(caseCommunications.id, commId))).limit(1)
     )[0];
-    if (!comm) return { ok: false as const, error: "missing_comm" };
-    if (comm.status !== "approved" && comm.status !== "queued") return { ok: false as const, error: "not_approved" };
+    if (!comm) {
+      throw new EmploymentCasesError({ code: "CASE_NOT_FOUND", httpStatus: 404, message: "Meddelandet hittades inte." });
+    }
+
+    if (comm.status !== "queued") {
+      throw new EmploymentCasesError({
+        code: "COMMUNICATION_NOT_APPROVED",
+        httpStatus: 409,
+        message: "Meddelandet är inte köat för skickning.",
+      });
+    }
+
+    if (comm.relatedDocumentId) {
+      const doc = (
+        await db
+          .select()
+          .from(caseDocuments)
+          .where(and(eq(caseDocuments.tenantId, input.tenantId), eq(caseDocuments.caseId, comm.caseId), eq(caseDocuments.id, comm.relatedDocumentId)))
+          .limit(1)
+      )[0];
+      if (!doc || doc.status !== "approved") {
+        throw new EmploymentCasesError({
+          code: "DOCUMENT_NOT_APPROVED",
+          httpStatus: 409,
+          message: "Dokumentet måste godkännas innan utskick kan ske.",
+        });
+      }
+    }
 
     const inboundDomain = process.env.EMAIL_INBOUND_DOMAIN || "inbound.pixdrift.local";
     const alias = await ensureCaseAlias({ tenantId: input.tenantId, caseId: comm.caseId, inboundDomain });
@@ -425,6 +490,7 @@ export async function generateMeetingInvitationAndDraftEmail(input: {
       ccAddresses: [],
       bccAddresses: [],
       attachments: [{ blobPath: stored.blobPath, filename: "kallelse.ics", contentType: "text/calendar" }],
+      relatedDocumentId: docId,
       provider: null,
       providerMessageId: null,
       threadKey: null,
