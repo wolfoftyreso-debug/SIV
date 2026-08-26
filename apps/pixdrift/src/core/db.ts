@@ -14,13 +14,25 @@ export function getSql() {
     throw new Error("DATABASE_URL is required");
   }
 
+  const ssl =
+    process.env.DATABASE_SSL_MODE === "disable"
+      ? false
+      : (() => {
+          try {
+            const host = new URL(url).hostname;
+            return host === "localhost" || host === "127.0.0.1" ? false : "require";
+          } catch {
+            return "require";
+          }
+        })();
+
   const sql =
     globalThis.__pixdriftSql ??
     postgres(url, {
       max: 10,
       idle_timeout: 20,
       connect_timeout: 10,
-      ssl: "require",
+      ssl,
     });
 
   globalThis.__pixdriftSql = sql;

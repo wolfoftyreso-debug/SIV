@@ -10,8 +10,11 @@ async function main() {
 
   const tenantId = process.env.DEV_TENANT_ID || randomUUID();
   const actorId = process.env.DEV_ACTOR_ID || randomUUID();
+  const appDbPassword = process.env.PIXDRIFT_APP_DB_PASSWORD || "pixdrift_app_pw";
 
-  const sql = postgres(url, { max: 1, ssl: "require" });
+  const host = new URL(url).hostname;
+  const ssl = host === "localhost" || host === "127.0.0.1" ? false : "require";
+  const sql = postgres(url, { max: 1, ssl });
   try {
     // Tenants / users are part of 001 migration; we keep bootstrap idempotent.
     await sql.begin(async (tx) => {
@@ -31,12 +34,28 @@ async function main() {
       `;
     });
 
+    // Ensure the app role can login in dev, so RLS is tested.
+    await sql.unsafe(`alter role pixdrift_app password '${appDbPassword.replaceAll("'", "''")}'`);
+
     process.stdout.write("Dev bootstrap complete.\n\n");
     process.stdout.write("Add these environment variables for local dev:\n\n");
     process.stdout.write(`DEV_TENANT_ID=${tenantId}\n`);
     process.stdout.write(`DEV_ACTOR_ID=${actorId}\n`);
     process.stdout.write("DEV_ROLES=tenant_owner,case_admin\n");
     process.stdout.write("EMPLOYMENT_CASES_DB_MODE=postgres\n");
+    process.stdout.write(`PIXDRIFT_APP_DB_PASSWORD=${appDbPassword}\n`);
+    process.stdout.write("\nSuggested runtime DATABASE_URL (pixdrift_app):\n");
+    try {
+      const u = new URL(url);
+      u.username = "pixdrift_app";
+      u.password = appDbPassword;
+      process.stdout.write(`DATABASE_URL=${u.toString()}\n`);
+      if (host === "localhost" || host === "127.0.0.1") {
+        process.stdout.write("DATABASE_SSL_MODE=disable\n");
+      }
+    } catch {
+      // ignore
+    }
   } finally {
     await sql.end({ timeout: 5 });
   }

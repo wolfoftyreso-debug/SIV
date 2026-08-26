@@ -13,7 +13,9 @@ async function main() {
     throw new Error("DATABASE_MIGRATION_URL or DATABASE_URL is required to run migrations");
   }
 
-  const sql = postgres(url, { max: 1, ssl: "require" });
+  const host = new URL(url).hostname;
+  const ssl = host === "localhost" || host === "127.0.0.1" ? false : "require";
+  const sql = postgres(url, { max: 1, ssl });
 
   try {
     const files = (await readdir(migrationsDir))

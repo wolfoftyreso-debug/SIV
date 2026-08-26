@@ -15,6 +15,10 @@ import type {
 export class TestEmailProvider implements EmailProvider {
   private readonly inbox = new Map<string, ReceivedEmail>();
 
+  seedReceivedEmail(email: ReceivedEmail) {
+    this.inbox.set(email.providerEmailId, email);
+  }
+
   async send(message: OutboundEmail): Promise<SendResult> {
     const providerMessageId = `test_${randomUUID()}`;
     return { provider: "test", providerMessageId, raw: { message, attachments: message.attachments?.length ?? 0 } };
@@ -22,7 +26,20 @@ export class TestEmailProvider implements EmailProvider {
 
   async verifyWebhook(_headers: Headers, rawBody: string): Promise<VerifiedWebhookEvent> {
     const id = `test_${randomUUID()}`;
-    return { provider: "resend", type: "email.received", id, timestamp: new Date().toISOString(), data: { rawBody } };
+    try {
+      const parsed = JSON.parse(rawBody);
+      const type = String(parsed?.type ?? "email.received");
+      const emailId = parsed?.data?.email_id ?? parsed?.data?.emailId;
+      return {
+        provider: "resend",
+        type,
+        id,
+        timestamp: new Date().toISOString(),
+        data: emailId ? { email_id: String(emailId) } : { rawBody },
+      };
+    } catch {
+      return { provider: "resend", type: "email.received", id, timestamp: new Date().toISOString(), data: { rawBody } };
+    }
   }
 
   async getReceivedEmail(providerEmailId: string): Promise<ReceivedEmail> {
