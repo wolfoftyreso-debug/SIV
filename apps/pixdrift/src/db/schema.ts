@@ -279,6 +279,21 @@ export const outboxEvents = pgTable(
   })
 );
 
+export const outboxPayloads = pgTable(
+  "outbox_payloads",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    payload: jsonb("payload").notNull().$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    tenantIdx: index("outbox_payloads_tenant_idx").on(t.tenantId, t.createdAt),
+  })
+);
+
 export const auditEvents = pgTable(
   "audit_events",
   {
@@ -546,6 +561,23 @@ export const communicationEvents = pgTable(
   },
   (t) => ({
     commIdx: index("communication_events_comm_idx").on(t.tenantId, t.communicationId, t.occurredAt),
+  })
+);
+
+export const webhookEvents = pgTable(
+  "webhook_events",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    externalEventId: text("external_event_id").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+    eventType: text("event_type").notNull(),
+    payloadHash: text("payload_hash").notNull(),
+  },
+  (t) => ({
+    providerEventUidx: uniqueIndex("webhook_events_provider_event_uidx").on(t.provider, t.externalEventId),
+    receivedIdx: index("webhook_events_received_idx").on(t.receivedAt),
   })
 );
 
