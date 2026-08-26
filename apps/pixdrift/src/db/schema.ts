@@ -255,6 +255,55 @@ export const caseDeadlines = pgTable(
   })
 );
 
+export const caseMeetings = pgTable(
+  "case_meetings",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => employmentCases.id, { onDelete: "cascade" }),
+    meetingType: text("meeting_type").notNull(),
+    title: text("title").notNull(),
+    purpose: text("purpose").notNull(),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    location: text("location"),
+    status: text("status").notNull(),
+    createdBy: uuid("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    version: integer("version").notNull(),
+  },
+  (t) => ({
+    tenantCaseIdx: index("case_meetings_tenant_case_idx").on(t.tenantId, t.caseId),
+  })
+);
+
+export const meetingParticipants = pgTable(
+  "meeting_participants",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => employmentCases.id, { onDelete: "cascade" }),
+    meetingId: uuid("meeting_id")
+      .notNull()
+      .references(() => caseMeetings.id, { onDelete: "cascade" }),
+    participantName: text("participant_name").notNull(),
+    participantEmail: text("participant_email"),
+    role: text("role").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    meetingIdx: index("meeting_participants_meeting_idx").on(t.tenantId, t.meetingId),
+  })
+);
+
 export const outboxEvents = pgTable(
   "outbox_events",
   {
