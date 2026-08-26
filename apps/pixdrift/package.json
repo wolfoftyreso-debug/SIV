@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:migrate:dry": "tsx scripts/migrate.ts --dry-run"
+    "db:migrate:dry": "tsx scripts/migrate.ts --dry-run",
+    "dev:bootstrap": "tsx scripts/dev-bootstrap.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
